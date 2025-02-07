@@ -19,10 +19,11 @@ export default function Home() {
       });
       
       const data = await response.json();
+      console.log("API Response:", data); // Log the entire response
 
       // Pass the generated SQL query as a query param to the results page
-      if (data.sqlQuery) {
-        router.push(`/result?query=${encodeURIComponent(data.sqlQuery)}`);
+      if (data.sql) {
+        router.push(`/result?query=${encodeURIComponent(data.sql)}`);
       } else {
         console.error("Failed to generate SQL query.");
       }

@@ -1,10 +1,11 @@
 import os
+import logging
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from openai import OpenAI
 from dotenv import load_dotenv
 
-# Load environment variables from .env file
+# Load environment variables
 load_dotenv()
 
 # Fetch API keys
@@ -15,7 +16,10 @@ client = OpenAI(api_key=OPENAI_API_KEY)
 
 # Flask app setup
 app = Flask(__name__)
-CORS(app)  # Enable Cross-Origin Resource Sharing (CORS) for frontend access
+CORS(app)  # Enable CORS for frontend access
+
+# Configure logging
+logging.basicConfig(level=logging.DEBUG)
 
 def generate_sql_query(prompt: str) -> str:
     """Generate SQL query using OpenAI."""
@@ -26,17 +30,22 @@ def generate_sql_query(prompt: str) -> str:
         )
         return completion.choices[0].message.content.strip("```sql\n").strip("\n```")
     except Exception as e:
+        logging.error(f"Error generating SQL query: {str(e)}")
         return f"Error generating SQL query: {str(e)}"
 
 @app.route('/sql-query', methods=['POST'])
 def generate_sql():
     """API endpoint to generate SQL query based on user input."""
     try:
+        logging.info("Received request to /sql-query")
         data = request.get_json()
-        user_query = data.get("query")
+        logging.debug(f"Request JSON: {data}")
 
-        if not user_query:
+        if not data or "query" not in data:
+            logging.warning("No 'query' field in request JSON")
             return jsonify({"error": "No query provided"}), 400
+
+        user_query = data["query"]
 
         # Define table schema information
         table_info = """
@@ -83,10 +92,12 @@ def generate_sql():
 
         # Generate SQL query using OpenAI
         sql_query = generate_sql_query(base_prompt)
+        logging.info(f"Generated SQL Query: {sql_query}")
 
         return jsonify({"sql": sql_query})
 
     except Exception as e:
+        logging.error(f"Server error: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':

@@ -72,7 +72,7 @@ def main():
     2. ALWAYS add 'LIMIT {top_k}' at the end of the query unless:
       - The question explicitly asks for all records
       - The query uses GROUP BY and needs to show all groups
-      - The query is counting records (using COUNT)
+      - The query is counting records (using COUNT)cls
       - The query calculates aggregates that need all data
 
     Address and Location Queries:
