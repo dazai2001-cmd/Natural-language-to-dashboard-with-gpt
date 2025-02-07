@@ -24,11 +24,11 @@ export default function Result() {
   return (
     <div className="flex flex-col items-center justify-center h-screen bg-background">
       <h1 className="text-3xl text-green-500 mb-4">
-        Results for: <span className="text-green-500">{query}</span>
+        Generated query
       </h1>
 
       <div className="bg-white p-8 rounded-2xl shadow-md w-3/4 max-w-2xl text-center">
-        <p className="text-background">{sqlQuery}</p>
+        <p className="text-green-500">{query}</p>
       </div>
 
       <button
