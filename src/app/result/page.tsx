@@ -46,7 +46,6 @@ export default function Result() {
           <>
             <p className="text-green-500 font-semibold mb-4">Your Question:</p>
             <p className="text-gray-700 mb-6">{query}</p>
-            <p className="text-gray-900">{sqlQuery}</p>
           </>
         )}
       </div>
