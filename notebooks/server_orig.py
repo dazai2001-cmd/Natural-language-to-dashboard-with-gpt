@@ -1,7 +1,6 @@
-import os, re
+import os
 import logging
 import psycopg2
-import json
 import pandas as pd
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -34,45 +33,17 @@ conn = psycopg2.connect(
     port="5432"
 )
 
-def generate_sql_query(user_question: str) -> str:
-    prompt = f"""
-    You are a PostgreSQL expert specialized in Dota 2 analytics. Generate an SQL query based on this schema:
-
-    - **matches** (match_id, start_time, duration, radiant_win)
-    - **players** (match_id, account_id, hero_id, kills, deaths, assists, gold_per_min, xp_per_min)
-    - **heroes** (hero_id, localized_name, primary_attr, attack_type, roles)
-    - **items** (item_id, name, cost, description)
-    - **teams** (team_id, name, rating, wins, losses)
-
-    **Question:** {user_question}
-
-    - Use correct **JOINs** between tables.
-    - Ensure correct **GROUP BY** and **ORDER BY** when needed.
-    - Always **limit results to 10 rows** unless specified otherwise.
-
-    **Return ONLY the SQL query. No explanations.**
-    """
-    
+def generate_sql_query(prompt: str) -> str:
+    """Generate SQL query using OpenAI."""
     try:
-        response = client.chat.completions.create(
+        completion = client.chat.completions.create(
             model="gpt-4",
-            messages=[
-                {"role": "system", "content": "You are an expert PostgreSQL database assistant."},
-                {"role": "user", "content": prompt}
-            ]
+            messages=[{"role": "user", "content": prompt}]
         )
-        
-        sql_query = response.choices[0].message.content.strip()
-
-        # 🚀 Remove markdown-style backticks (` ```sql ` and ` ``` `)
-        sql_query = re.sub(r"```sql|```", "", sql_query).strip()
-
-        print(f"🔍 Cleaned SQL Query:\n{sql_query}")
-
-        return sql_query
+        return completion.choices[0].message.content.strip("```sql\n").strip("\n```")
     except Exception as e:
-        print(f"❌ OpenAI Error: {e}")
-        return None
+        logging.error(f"Error generating SQL query: {str(e)}")
+        return f"Error generating SQL query: {str(e)}"
 
 def execute_query(query: str):
     """Execute SQL query on PostgreSQL database and return results."""
@@ -89,8 +60,8 @@ def execute_query(query: str):
         logging.error(f"Database query execution error: {str(e)}")
         return {"error": str(e)}
 
-def decide_chart_type(df):
-    
+def decide_chart_type(query_results):
+    df = pd.DataFrame(query_results)
 
     prompt = f"""
     Given the following SQL query result, determine the best chart type.
@@ -116,59 +87,6 @@ def decide_chart_type(df):
     except Exception as e:
         print(f"❌ OpenAI Error (Chart Type): {e}")
         return "bar"
-
-# OpenAI - Convert Data for Chart.js (Fixed for OpenAI v1.0+)
-def transform_data_for_chart(chart_type, sql_result):
-    prompt = f"""
-    Convert the following SQL result into a JSON format for a `{chart_type}` chart.
-
-    **SQL Result:**  
-    {sql_result.to_dict(orient="records")}
-
-    Ensure the response is **valid JSON** matching Chart.js format:
-    - **Bar Chart:**
-      {{
-        "labels": ["Category1", "Category2"],
-        "datasets": [{{
-          "data": [value1, value2], 
-          "label": "Metric"
-        }}]
-      }}
-    - **Line Chart:**
-      {{
-        "labels": ["Time1", "Time2"],
-        "datasets": [{{
-          "data": [value1, value2], 
-          "label": "Trend"
-        }}]
-      }}
-    - **Pie Chart:**
-      {{
-        "labels": ["Category1", "Category2"],
-        "datasets": [{{
-          "data": [value1, value2]
-        }}]
-      }}
-
-    **Return only valid JSON. No explanations.**
-    """
-    
-    try:
-        response = client.chat.completions.create(
-            model="gpt-4",
-            messages=[
-                {"role": "system", "content": "You are a Chart.js data formatting assistant."},
-                {"role": "user", "content": prompt}
-            ]
-        )
-        json_data = response.choices[0].message.content.strip()
-
-        # Validate JSON
-        json.loads(json_data)
-        return json_data
-    except Exception as e:
-        print(f"❌ OpenAI Error (Chart Data): {e}")
-        return '{"labels": [], "datasets": []}'
 
 @app.route('/sql-query', methods=['POST'])
 def generate_sql():
@@ -229,15 +147,10 @@ def generate_sql():
         query_results = execute_query(sql_query)
         print(query_results)
 
-        df = pd.DataFrame(query_results)
         # Determine Best Chart Type
-        chart_type = decide_chart_type(df)
+        chart_type = decide_chart_type(query_results)
 
-        chart_data = transform_data_for_chart(chart_type, df)
-
-        print(f"📊 Generated Chart.js Data:\n{chart_data}")
-
-        return jsonify({"sql": sql_query, "results": query_results, "chart_type": chart_type, "chart_data": chart_data})
+        return jsonify({"sql": sql_query, "results": query_results, "chart_type": chart_type})
 
     except Exception as e:
         logging.error(f"Server error: {str(e)}")

@@ -65,7 +65,7 @@ export default function Result() {
                         ))}
                       </tr>
                     </thead>
-                    <tbody>
+                    <tbody className="text-black">
                       {results.map((row, index) => (
                         <tr key={index} className="border">
                           {Object.values(row).map((val, idx) => (
