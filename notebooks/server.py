@@ -1,5 +1,7 @@
 import os
 import logging
+import psycopg2
+import pandas as pd
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from openai import OpenAI
@@ -10,6 +12,7 @@ load_dotenv()
 
 # Fetch API keys
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+POSTGRES_PASS = os.getenv("POSTGRES_PASS")
 
 # Initialize OpenAI client
 client = OpenAI(api_key=OPENAI_API_KEY)
@@ -20,6 +23,15 @@ CORS(app)  # Enable CORS for frontend access
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
+
+# PostgreSQL connection
+conn = psycopg2.connect(
+    dbname="puppet_db",
+    user="postgres",
+    password=POSTGRES_PASS,
+    host="localhost",
+    port="5432"
+)
 
 def generate_sql_query(prompt: str) -> str:
     """Generate SQL query using OpenAI."""
@@ -33,9 +45,24 @@ def generate_sql_query(prompt: str) -> str:
         logging.error(f"Error generating SQL query: {str(e)}")
         return f"Error generating SQL query: {str(e)}"
 
+def execute_query(query: str):
+    """Execute SQL query on PostgreSQL database and return results."""
+    try:
+        with conn.cursor() as cur:
+            cur.execute(query)
+            columns = [desc[0] for desc in cur.description]  # Get column names
+            rows = cur.fetchall()  # Fetch all results
+
+            # Convert to list of dicts
+            results = [dict(zip(columns, row)) for row in rows]
+            return results
+    except Exception as e:
+        logging.error(f"Database query execution error: {str(e)}")
+        return {"error": str(e)}
+
 @app.route('/sql-query', methods=['POST'])
 def generate_sql():
-    """API endpoint to generate SQL query based on user input."""
+    """API endpoint to generate and execute SQL query."""
     try:
         logging.info("Received request to /sql-query")
         data = request.get_json()
@@ -48,74 +75,23 @@ def generate_sql():
         user_query = data["query"]
 
         # Define table schema information
-        table_info = """\
-                    customer:
-                        customer_key (TEXT, Primary Key): Unique identifier for each customer.
-                        first_name (TEXT): Customer's first name.
-                        last_name (TEXT): Customer's last name.
-                        source_system_name (TEXT): Source system of customer data.
-                        dob (DATE): Date of birth.
-                        gender (TEXT): Gender.
-                        create_timestamp (TIMESTAMP): Creation timestamp.
-
-                    address:
-                        address_key (TEXT, Primary Key): Unique identifier for each address.
-                        full_address (TEXT): Full address (street, city, etc.).
-                        state (TEXT): State or province.
-                        country (TEXT): Country.
-                        latitude (TEXT): Latitude.
-                        longitude (TEXT): Longitude.
-
-                    customer_address:
-                        customer_key (TEXT, Foreign Key): Links to 'customer' table.
-                        address_key (TEXT, Foreign Key): Links to 'address' table.
-                        PRIMARY KEY (customer_key, address_key).
-
-                    matches:
-                        match_id (BIGINT, Primary Key): Unique identifier for each match.
-                        start_time (INTEGER): Match start time.
-                        duration (INTEGER): Duration of the match.
-                        radiant_win (BOOLEAN): Indicates if the Radiant team won.
-
-                    players:
-                        match_id (BIGINT, Foreign Key): Links to 'matches' table.
-                        account_id (BIGINT): Player's account identifier.
-                        hero_id (INTEGER): Identifier for the hero used.
-                        kills (INTEGER): Number of kills.
-                        deaths (INTEGER): Number of deaths.
-                        assists (INTEGER): Number of assists.
-                        gold_per_min (INTEGER): Gold earned per minute.
-                        xp_per_min (INTEGER): Experience points earned per minute.
-                        PRIMARY KEY (match_id, account_id).
-
-                    heroes:
-                        hero_id (INTEGER, Primary Key): Unique identifier for each hero.
-                        localized_name (TEXT): Hero's localized name.
-                        primary_attr (TEXT): Primary attribute of the hero.
-                        attack_type (TEXT): Type of attack (melee/ranged).
-
-                    roles:
-                        role_id (SERIAL, Primary Key): Unique identifier for each role.
-                        role_name (TEXT): Name of the role (e.g., Carry, Support, etc.).
-
-                    hero_roles:
-                        hero_id (INTEGER, Foreign Key): Links to 'heroes' table.
-                        role_id (INTEGER, Foreign Key): Links to 'roles' table.
-                        PRIMARY KEY (hero_id, role_id).
-
-                    items:
-                        item_id (TEXT, Primary Key): Unique identifier for each item.
-                        name (TEXT): Item name.
-                        cost (INTEGER): Cost of the item.
-
-                    teams:
-                        team_id (INTEGER, Primary Key): Unique identifier for each team.
-                        name (TEXT): Team name.
-                        rating (FLOAT): Team rating.
-                        wins (INTEGER): Number of wins.
-                        losses (INTEGER): Number of losses.
-                    """
-
+        table_info = r"""
+            matches:
+                match_id (BIGINT, Primary Key), start_time (INTEGER), duration (INTEGER), radiant_win (BOOLEAN).
+            players:
+                match_id (BIGINT, Foreign Key), account_id (BIGINT), hero_id (INTEGER),
+                kills (INTEGER), deaths (INTEGER), assists (INTEGER), gold_per_min (INTEGER), xp_per_min (INTEGER).
+            heroes:
+                hero_id (INTEGER, Primary Key), localized_name (TEXT), primary_attr (TEXT), attack_type (TEXT).
+            roles:
+                role_id (SERIAL, Primary Key), role_name (TEXT).
+            hero_roles:
+                hero_id (INTEGER, Foreign Key), role_id (INTEGER, Foreign Key).
+            items:
+                item_id (TEXT, Primary Key), name (TEXT), cost (INTEGER).
+            teams:
+                team_id (INTEGER, Primary Key), name (TEXT), rating (FLOAT), wins (INTEGER), losses (INTEGER).
+            """
 
         # Construct the OpenAI prompt
         base_prompt = f"""
@@ -139,7 +115,10 @@ def generate_sql():
         sql_query = generate_sql_query(base_prompt)
         logging.info(f"Generated SQL Query: {sql_query}")
 
-        return jsonify({"sql": sql_query})
+        # Execute the query on the PostgreSQL database
+        query_results = execute_query(sql_query)
+
+        return jsonify({"sql": sql_query, "results": query_results})
 
     except Exception as e:
         logging.error(f"Server error: {str(e)}")

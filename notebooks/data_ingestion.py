@@ -39,6 +39,22 @@ def fetch_data(endpoint):
         print(f"❌ Error fetching {endpoint}: {response.status_code}")
         return None
 
+def fetch_public_matches_data(endpoint):
+    params = {
+        "min_rank": 50,  # Legend Rank minimum
+        "max_rank": 65,  # Ancient Rank maximum
+        "mmr_descending": 1  # Order by highest MMR first
+    }
+    API_URL = f"{OPENDOTA_API_BASE}/{endpoint}"
+    response = requests.get(API_URL, params=params)
+
+    if response.status_code == 200:
+        print("resp 200 for pubmatches")
+        return response.json()
+    else:
+        print(f"❌ Error fetching {endpoint}: {response.status_code}")
+        return None
+
 # Store Data in PostgreSQL using pandas with SQLAlchemy engine
 def save_to_postgres(df, table_name):
     """Saves data to PostgreSQL using pandas and SQLAlchemy."""
@@ -115,13 +131,15 @@ def fetch_and_store_teams():
         df_teams = pd.DataFrame(team_data)
         save_to_postgres(df_teams, "teams")
 
+
 # Fetch and Store Matches
-def fetch_and_store_matches(limit=5):
-    matches = fetch_data("publicMatches")
+def fetch_and_store_matches():
+    matches = fetch_public_matches_data("publicMatches")
+    print("public match data fetched")
     if matches:
         match_data = []
         players_data = []
-        for match in matches[:limit]:
+        for match in matches:
             match_id = match["match_id"]
             match_details = fetch_data(f"matches/{match_id}")
 
@@ -157,10 +175,10 @@ def fetch_and_store_matches(limit=5):
 if __name__ == "__main__":
     print("🚀 Fetching and storing Dota 2 data...")
 
-    fetch_and_store_heroes()
-    fetch_and_store_items()
-    fetch_and_store_teams()
-    fetch_and_store_matches(limit=5)
+    # fetch_and_store_heroes()
+    # fetch_and_store_items()
+    # fetch_and_store_teams()
+    fetch_and_store_matches()
 
     # Close the psycopg2 connection when done
     conn.close()
