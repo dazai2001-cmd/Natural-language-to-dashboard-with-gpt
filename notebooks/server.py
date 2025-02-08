@@ -48,29 +48,74 @@ def generate_sql():
         user_query = data["query"]
 
         # Define table schema information
-        table_info = """
-        1. customer:
-        - customer_key (TEXT, Primary Key): Unique identifier for each customer.
-        - first_name (TEXT): Customer's first name.
-        - last_name (TEXT): Customer's last name.
-        - source_system_name (TEXT): Source system of customer data.
-        - dob (DATE): Date of birth.
-        - gender (TEXT): Gender.
-        - create_timestamp (TIMESTAMP): Creation timestamp.
+        table_info = """\
+                    customer:
+                        customer_key (TEXT, Primary Key): Unique identifier for each customer.
+                        first_name (TEXT): Customer's first name.
+                        last_name (TEXT): Customer's last name.
+                        source_system_name (TEXT): Source system of customer data.
+                        dob (DATE): Date of birth.
+                        gender (TEXT): Gender.
+                        create_timestamp (TIMESTAMP): Creation timestamp.
 
-        2. address:
-        - address_key (TEXT, Primary Key): Unique identifier for each address.
-        - full_address (TEXT): Full address (street, city, etc.).
-        - state (TEXT): State or province.
-        - country (TEXT): Country.
-        - latitude (TEXT): Latitude.
-        - longitude (TEXT): Longitude.
+                    address:
+                        address_key (TEXT, Primary Key): Unique identifier for each address.
+                        full_address (TEXT): Full address (street, city, etc.).
+                        state (TEXT): State or province.
+                        country (TEXT): Country.
+                        latitude (TEXT): Latitude.
+                        longitude (TEXT): Longitude.
 
-        3. customer_address:
-        - customer_key (TEXT, Foreign Key): Links to 'customer' table.
-        - address_key (TEXT, Foreign Key): Links to 'address' table.
-        - PRIMARY KEY (customer_key, address_key).
-        """
+                    customer_address:
+                        customer_key (TEXT, Foreign Key): Links to 'customer' table.
+                        address_key (TEXT, Foreign Key): Links to 'address' table.
+                        PRIMARY KEY (customer_key, address_key).
+
+                    matches:
+                        match_id (BIGINT, Primary Key): Unique identifier for each match.
+                        start_time (INTEGER): Match start time.
+                        duration (INTEGER): Duration of the match.
+                        radiant_win (BOOLEAN): Indicates if the Radiant team won.
+
+                    players:
+                        match_id (BIGINT, Foreign Key): Links to 'matches' table.
+                        account_id (BIGINT): Player's account identifier.
+                        hero_id (INTEGER): Identifier for the hero used.
+                        kills (INTEGER): Number of kills.
+                        deaths (INTEGER): Number of deaths.
+                        assists (INTEGER): Number of assists.
+                        gold_per_min (INTEGER): Gold earned per minute.
+                        xp_per_min (INTEGER): Experience points earned per minute.
+                        PRIMARY KEY (match_id, account_id).
+
+                    heroes:
+                        hero_id (INTEGER, Primary Key): Unique identifier for each hero.
+                        localized_name (TEXT): Hero's localized name.
+                        primary_attr (TEXT): Primary attribute of the hero.
+                        attack_type (TEXT): Type of attack (melee/ranged).
+
+                    roles:
+                        role_id (SERIAL, Primary Key): Unique identifier for each role.
+                        role_name (TEXT): Name of the role (e.g., Carry, Support, etc.).
+
+                    hero_roles:
+                        hero_id (INTEGER, Foreign Key): Links to 'heroes' table.
+                        role_id (INTEGER, Foreign Key): Links to 'roles' table.
+                        PRIMARY KEY (hero_id, role_id).
+
+                    items:
+                        item_id (TEXT, Primary Key): Unique identifier for each item.
+                        name (TEXT): Item name.
+                        cost (INTEGER): Cost of the item.
+
+                    teams:
+                        team_id (INTEGER, Primary Key): Unique identifier for each team.
+                        name (TEXT): Team name.
+                        rating (FLOAT): Team rating.
+                        wins (INTEGER): Number of wins.
+                        losses (INTEGER): Number of losses.
+                    """
+
 
         # Construct the OpenAI prompt
         base_prompt = f"""
