@@ -60,6 +60,34 @@ def execute_query(query: str):
         logging.error(f"Database query execution error: {str(e)}")
         return {"error": str(e)}
 
+def decide_chart_type(query_results):
+    df = pd.DataFrame(query_results)
+
+    prompt = f"""
+    Given the following SQL query result, determine the best chart type.
+
+    **SQL Result:**  
+    {df.to_dict(orient="records")}
+
+    Choose one:
+    - "bar" (for category-based comparisons, like top heroes by kills)
+    - "line" (for trends over time)
+    - "pie" (for percentage-based distribution)
+    - "scatter" (for numeric relationships, like kills vs GPM)
+
+    **Return only the chart type. No explanations.**
+    """
+    
+    try:
+        completion = client.chat.completions.create(
+            model="gpt-4",
+            messages=[{"role": "user", "content": prompt}]
+        )
+        return completion.choices[0].message.content.strip()
+    except Exception as e:
+        print(f"❌ OpenAI Error (Chart Type): {e}")
+        return "bar"
+
 @app.route('/sql-query', methods=['POST'])
 def generate_sql():
     """API endpoint to generate and execute SQL query."""
@@ -117,8 +145,12 @@ def generate_sql():
 
         # Execute the query on the PostgreSQL database
         query_results = execute_query(sql_query)
+        print(query_results)
 
-        return jsonify({"sql": sql_query, "results": query_results})
+        # Determine Best Chart Type
+        chart_type = decide_chart_type(query_results)
+
+        return jsonify({"sql": sql_query, "results": query_results, "chart_type": chart_type})
 
     except Exception as e:
         logging.error(f"Server error: {str(e)}")
