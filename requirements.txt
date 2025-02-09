@@ -2,6 +2,8 @@
 react
 next
 tailwindcss
+react-chartjs-2
+chart.js
 
 #Backend
 Flask

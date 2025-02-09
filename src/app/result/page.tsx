@@ -2,13 +2,20 @@
 
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import { Bar, Line, Pie, Scatter } from "react-chartjs-2";
+import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, PointElement, LineElement, ArcElement, Tooltip, Legend } from "chart.js";
+
+// Register Chart.js components
+ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, ArcElement, Tooltip, Legend);
 
 export default function Result() {
   const searchParams = useSearchParams();
   const query = searchParams.get("query");
   
   const [sqlQuery, setSqlQuery] = useState<string>("");
-  const [results, setResults] = useState<any[]>([]); // Store query results
+  const [results, setResults] = useState<any[]>([]);
+  const [chartType, setChartType] = useState<string>("");
+  const [chartData, setChartData] = useState<any>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
 
@@ -16,17 +23,19 @@ export default function Result() {
     if (!query) return;
 
     setLoading(true);
-    setError(""); // Reset error message before new fetch
+    setError("");
 
     fetch("/api/sql-query", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question: query }), // Make sure this matches the backend format
+      body: JSON.stringify({ question: query }),
     })
       .then((res) => res.json())
       .then((data) => {
         setSqlQuery(data.sql || "No query generated");
-        setResults(data.results || []); // Store query results
+        setResults(data.results || []);
+        setChartType(data.chart_type || "");
+        setChartData(data.chart_data || null);
         setLoading(false);
       })
       .catch((err) => {
@@ -35,6 +44,28 @@ export default function Result() {
         setLoading(false);
       });
   }, [query]);
+
+  const renderChart = () => {
+    if (!chartData || !chartType) return null;
+
+    const chartProps = {
+      data: chartData,
+      options: { responsive: true, plugins: { legend: { position: "top" } } },
+    };
+
+    switch (chartType) {
+      case "bar":
+        return <Bar {...chartProps} />;
+      case "line":
+        return <Line {...chartProps} />;
+      case "pie":
+        return <Pie {...chartProps} />;
+      case "scatter":
+        return <Scatter {...chartProps} />;
+      default:
+        return null;
+    }
+  };
 
   return (
     <div className="flex flex-col items-center justify-center h-[80vh] bg-background w-full px-4">
@@ -52,7 +83,6 @@ export default function Result() {
               {sqlQuery}
             </pre>
 
-            {/* Display Query Results */}
             {results.length > 0 && (
               <div className="mt-6">
                 <h2 className="text-xl text-green-500 font-semibold mb-2">Query Results</h2>
@@ -76,6 +106,13 @@ export default function Result() {
                     </tbody>
                   </table>
                 </div>
+              </div>
+            )}
+
+            {chartData && chartType && (
+              <div className="mt-6 w-full max-w-lg">
+                <h2 className="text-xl text-green-500 font-semibold mb-2">Visualization</h2>
+                {renderChart()}
               </div>
             )}
           </>
