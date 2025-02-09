@@ -89,33 +89,66 @@ def execute_query(query: str):
         logging.error(f"Database query execution error: {str(e)}")
         return {"error": str(e)}
 
+# def decide_chart_type(df):
+    
+
+#     prompt = f"""
+#     Given the following SQL query result, determine the best chart type.
+
+#     **SQL Result:**  
+#     {df.to_dict(orient="records")}
+
+#     Choose one:
+#     - "bar" (for category-based comparisons, like top heroes by kills)
+#     - "line" (for trends over time)
+#     - "pie" (for percentage-based distribution)
+#     - "scatter" (for numeric relationships, like kills vs GPM)
+
+#     **Return only the chart type. No explanations.**
+#     """
+    
+#     try:
+#         completion = client.chat.completions.create(
+#             model="gpt-4",
+#             messages=[{"role": "user", "content": prompt}]
+#         )
+#         return completion.choices[0].message.content.strip()
+#     except Exception as e:
+#         print(f"❌ OpenAI Error (Chart Type): {e}")
+#         return "bar"
+
+        
 def decide_chart_type(df):
-    
+    print("🔍 DataFrame for Chart Type Decision:\n", df.to_dict(orient="records"))
 
-    prompt = f"""
-    Given the following SQL query result, determine the best chart type.
+    # Detect column names and data types
+    columns = df.columns.tolist()
+    print(f"cols --> {columns}")
+    numeric_columns = [col for col in columns if df[col].dtype in [int, float]]
+    print(f"cols --> {numeric_columns}")
 
-    **SQL Result:**  
-    {df.to_dict(orient="records")}
+    # 🔥 Force Scatter Plot if Exactly Two Numeric Columns Exist
+    if len(numeric_columns) == 2:
+        print("🔬 Numeric Relationship Detected → Using Scatter Chart")
+        return "scatter"
 
-    Choose one:
-    - "bar" (for category-based comparisons, like top heroes by kills)
-    - "line" (for trends over time)
-    - "pie" (for percentage-based distribution)
-    - "scatter" (for numeric relationships, like kills vs GPM)
+    # 🔥 Use Line Chart if There’s a Time-Based Column
+    time_keywords = ["date", "time", "month", "week", "year"]
+    if any(keyword in columns for keyword in time_keywords):
+        print("📈 Detected Time-Based Data → Using Line Chart")
+        return "line"
 
-    **Return only the chart type. No explanations.**
-    """
-    
-    try:
-        completion = client.chat.completions.create(
-            model="gpt-4",
-            messages=[{"role": "user", "content": prompt}]
-        )
-        return completion.choices[0].message.content.strip()
-    except Exception as e:
-        print(f"❌ OpenAI Error (Chart Type): {e}")
+    # 🔥 If a category + single numeric column exists, use bar or pie
+    if len(columns) == 2:
+        category_col, numeric_col = columns
+        if df[numeric_col].sum() <= 100 and df[numeric_col].max() <= 100:
+            print("🥧 Percentage-Based Data → Using Pie Chart")
+            return "pie"
+        print("📊 Category Data → Using Bar Chart")
         return "bar"
+
+    print("📊 Defaulting to Bar Chart")
+    return "scatter"
 
 # OpenAI - Convert Data for Chart.js (Fixed for OpenAI v1.0+)
 def transform_data_for_chart(chart_type, sql_result):

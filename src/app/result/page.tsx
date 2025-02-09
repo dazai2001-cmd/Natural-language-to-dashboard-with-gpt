@@ -47,25 +47,108 @@ export default function Result() {
 
   const renderChart = () => {
     if (!chartData || !chartType) return null;
-
+  
+    // Base chart props that are common across all chart types
     const chartProps = {
       data: chartData,
       options: { responsive: true, plugins: { legend: { position: "top" } } },
     };
-
+  
     switch (chartType) {
       case "bar":
+        chartProps.options = {
+          ...chartProps.options,
+          scales: {
+            x: {
+              // Customize x-axis for bar chart
+              title: {
+                display: true,
+                text: "Category",
+              },
+            },
+            y: {
+              // Customize y-axis for bar chart
+              title: {
+                display: true,
+                text: "Value",
+              },
+              beginAtZero: true,
+            },
+          },
+        };
         return <Bar {...chartProps} />;
+  
       case "line":
+        chartProps.options = {
+          ...chartProps.options,
+          scales: {
+            x: {
+              // Customize x-axis for line chart
+              title: {
+                display: true,
+                text: "Time",
+              },
+            },
+            y: {
+              // Customize y-axis for line chart
+              title: {
+                display: true,
+                text: "Value",
+              },
+            },
+          },
+          elements: {
+            line: {
+              tension: 0.4, // Curvature of line
+            },
+          },
+        };
         return <Line {...chartProps} />;
+  
       case "pie":
+        chartProps.options = {
+          ...chartProps.options,
+          plugins: {
+            ...chartProps.options.plugins,
+            tooltip: {
+              callbacks: {
+                label: (tooltipItem) => {
+                  return `${tooltipItem.label}: ${tooltipItem.raw}%`;
+                },
+              },
+            },
+          },
+          cutoutPercentage: 50, // Pie chart center hole percentage (can make it a donut chart)
+        };
         return <Pie {...chartProps} />;
+  
       case "scatter":
+        chartProps.options = {
+          ...chartProps.options,
+          scales: {
+            x: {
+              // Customize x-axis for scatter chart
+              title: {
+                display: true,
+                text: "X-Axis Label",
+              },
+            },
+            y: {
+              // Customize y-axis for scatter chart
+              title: {
+                display: true,
+                text: "Y-Axis Label",
+              },
+            },
+          },
+        };
         return <Scatter {...chartProps} />;
+  
       default:
         return null;
     }
   };
+  
 
   return (
     <div className="flex flex-col items-center justify-center h-[80vh] bg-background w-full px-4">
