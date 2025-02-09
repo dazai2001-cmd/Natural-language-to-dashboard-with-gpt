@@ -1,0 +1,12 @@
+#Frontend
+react
+next
+tailwindcss
+
+#Backend
+Flask
+flask-cors
+openai
+python-dotenv
+psycopg2
+pandas
