@@ -11,7 +11,7 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineEleme
 export default function Result() {
   const searchParams = useSearchParams();
   const query = searchParams.get("query");
-  
+
   const [sqlQuery, setSqlQuery] = useState<string>("");
   const [results, setResults] = useState<any[]>([]);
   const [chartType, setChartType] = useState<string>("");
@@ -28,15 +28,20 @@ export default function Result() {
     fetch("/api/sql-query", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question: query }),
+      body: JSON.stringify({ query: query }), // Using "query" instead of "question"
     })
       .then((res) => res.json())
       .then((data) => {
-        setSqlQuery(data.sql || "No query generated");
-        setResults(data.results || []);
-        setChartType(data.chart_type || "");
-        setChartData(data.chart_data || null);
-        setLoading(false);
+        if (data.error) {
+          setError(data.error);
+          setLoading(false);
+        } else {
+          setSqlQuery(data.sql || "No query generated");
+          setResults(data.results || []);
+          setChartType(data.chart_type || "");
+          setChartData(data.chart_data || null);
+          setLoading(false);
+        }
       })
       .catch((err) => {
         console.error("Error fetching SQL query:", err);
@@ -47,27 +52,25 @@ export default function Result() {
 
   const renderChart = () => {
     if (!chartData || !chartType) return null;
-  
+
     // Base chart props that are common across all chart types
     const chartProps = {
       data: chartData,
       options: { responsive: true, plugins: { legend: { position: "top" } } },
     };
-  
+
     switch (chartType) {
       case "bar":
         chartProps.options = {
           ...chartProps.options,
           scales: {
             x: {
-              // Customize x-axis for bar chart
               title: {
                 display: true,
                 text: "Category",
               },
             },
             y: {
-              // Customize y-axis for bar chart
               title: {
                 display: true,
                 text: "Value",
@@ -77,20 +80,18 @@ export default function Result() {
           },
         };
         return <Bar {...chartProps} />;
-  
+
       case "line":
         chartProps.options = {
           ...chartProps.options,
           scales: {
             x: {
-              // Customize x-axis for line chart
               title: {
                 display: true,
                 text: "Time",
               },
             },
             y: {
-              // Customize y-axis for line chart
               title: {
                 display: true,
                 text: "Value",
@@ -104,7 +105,7 @@ export default function Result() {
           },
         };
         return <Line {...chartProps} />;
-  
+
       case "pie":
         chartProps.options = {
           ...chartProps.options,
@@ -121,20 +122,18 @@ export default function Result() {
           cutoutPercentage: 50, // Pie chart center hole percentage (can make it a donut chart)
         };
         return <Pie {...chartProps} />;
-  
+
       case "scatter":
         chartProps.options = {
           ...chartProps.options,
           scales: {
             x: {
-              // Customize x-axis for scatter chart
               title: {
                 display: true,
                 text: "X-Axis Label",
               },
             },
             y: {
-              // Customize y-axis for scatter chart
               title: {
                 display: true,
                 text: "Y-Axis Label",
@@ -143,12 +142,11 @@ export default function Result() {
           },
         };
         return <Scatter {...chartProps} />;
-  
+
       default:
         return null;
     }
   };
-  
 
   return (
     <div className="flex flex-col items-center justify-center h-[80vh] bg-background w-full px-4">
