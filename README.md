@@ -2,7 +2,29 @@
 
 Puppet Dashboard is an agentic analytics app: a natural-language analyst that can inspect connected PostgreSQL data, run safe queries, and turn the answer into one or more useful dashboard views.
 
-The Dota 2/U.GG-style experience is the demo vertical. The bigger idea is broader: connect finance, sales, product, operations, or game data and let an analyst ask questions in plain English while the app checks the schema, queries the data, explains the answer, and builds the right charts.
+The Dota 2/U.GG-style experience is the current demo vertical, not the whole product. The bigger idea is broader: connect finance, sales, product, operations, or game data and let an analyst ask questions in plain English while the app checks the schema, queries the data, explains the answer, and builds the right charts.
+
+## Screenshots
+
+The screenshots below use Dota 2 because that is the bundled demo dataset. The same app architecture is meant for any PostgreSQL-backed dataset: the backend introspects the schema, the SQL agent plans a read-only query, and the frontend renders dashboards from the returned rows.
+
+### Agentic analytics hub
+
+The homepage currently presents a U.GG-style meta hub for the Dota demo, with live Postgres metrics, a local Qwen analyst, hero selection, counters, synergies, and natural-language entry points.
+
+![Agentic analytics hub](docs/screenshots/agentic-meta-hub.png)
+
+### Multi-chart analyst result
+
+For questions where one chart is not enough, the app can return multiple charts plus the raw SQL, result table, sample-size context, and an analyst readout.
+
+![Counter analysis with multiple charts](docs/screenshots/dota-counter-analysis.png)
+
+### Time-series dashboard
+
+Trend questions become dashboard pages too, using the same query/result/chart pipeline.
+
+![Meta trend analysis](docs/screenshots/meta-trend-analysis.png)
 
 ## What it does now
 
