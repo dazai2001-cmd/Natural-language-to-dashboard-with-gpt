@@ -1,67 +1,73 @@
-"use server";
+const BACKEND_URLS = process.env.BACKEND_URL
+  ? [process.env.BACKEND_URL]
+  : ["http://127.0.0.1:5001", "http://127.0.0.1:5000"];
 
-export async function POST(req: Request) {
-    try {
-        const body = await req.json(); // Parse JSON request
-        console.log("Sending request to Flask:", body);
+export async function GET() {
+  return Response.json({
+    status: "ok",
+    message: "Analytics API is alive. Send a POST request with JSON like { \"question\": \"what counters Pudge in Dota 2?\" }.",
+    backends: BACKEND_URLS,
+  });
+}
 
-        const response = await fetch("http://127.0.0.1:5000/sql-query", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ query: body.question }),
-        });
+export async function POST(request: Request) {
+  try {
+    const body = (await request.json()) as { question?: unknown };
+    const question = typeof body.question === "string" ? body.question.trim() : "";
 
-        console.log("Flask response status:", response.status);
-
-        if (!response.ok) {
-            throw new Error(`Flask server error: ${response.statusText}`);
-        }
-
-        const data = await response.json();
-        console.log("Flask response data:", data);
-
-        // Check if the response contains required fields
-        if (
-            !data.sql ||
-            !data.results ||
-            !data.chart_type ||
-            !data.chart_data ||
-            typeof data.chart_data !== "string"
-        ) {
-            throw new Error("Invalid response format from Flask");
-        }
-
-        // Parse chart_data (which is a JSON string) into an object
-        let chartData;
-        try {
-            chartData = JSON.parse(data.chart_data);
-        } catch (e) {
-            throw new Error("Failed to parse chart_data JSON");
-        }
-
-        // Return the SQL query, the query results, and chart data in a structured format
-        return new Response(
-            JSON.stringify({
-                sql: data.sql,
-                results: data.results,
-                chart_type: data.chart_type,
-                chart_data: chartData, // Include parsed chart_data
-            }),
-            {
-                status: 200,
-                headers: { "Content-Type": "application/json" },
-            }
-        );
-    } catch (error) {
-        console.error("Error calling Flask server:", error);
-        return new Response(
-            JSON.stringify({ error: "Failed to fetch results from the database." }),
-            {
-                status: 500,
-                headers: { "Content-Type": "application/json" },
-            }
-        );
+    if (!question) {
+      return Response.json({ error: "A non-empty question is required." }, { status: 400 });
     }
+
+    let response: Response | null = null;
+    let lastConnectionError: unknown = null;
+
+    for (const backendUrl of BACKEND_URLS) {
+      try {
+        response = await fetch(`${backendUrl}/sql-query`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ question }),
+          cache: "no-store",
+          signal: AbortSignal.timeout(130_000),
+        });
+        break;
+      } catch (connectionError) {
+        lastConnectionError = connectionError;
+      }
+    }
+
+    if (!response) {
+      throw lastConnectionError instanceof Error
+        ? lastConnectionError
+        : new Error("No analytics backend was reachable.");
+    }
+
+    const data = await response.json().catch(() => null);
+    if (!response.ok) {
+      const message = data?.error ?? `Analytics backend returned ${response.status}.`;
+      return Response.json({ error: message }, { status: response.status });
+    }
+
+    if (
+      !data ||
+      typeof data.sql !== "string" ||
+      !Array.isArray(data.results) ||
+      typeof data.chart_type !== "string" ||
+      !data.chart_data
+    ) {
+      return Response.json({ error: "The analytics backend returned an invalid response." }, { status: 502 });
+    }
+
+    const chartData =
+      typeof data.chart_data === "string" ? JSON.parse(data.chart_data) : data.chart_data;
+
+    return Response.json({ ...data, chart_data: chartData });
+  } catch (error) {
+    console.error("Analytics API error:", error);
+    const message = error instanceof Error && error.name === "TimeoutError"
+      ? "The analytics request timed out. Please try again."
+      : "Could not reach the analytics backend. Is Flask running on port 5001?";
+    return Response.json({ error: message }, { status: 502 });
+  }
 }

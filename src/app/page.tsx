@@ -1,45 +1,26 @@
-"use client";
+import HomeDashboard, { MetaDashboard } from "@/components/HomeDashboard";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+const BACKEND_URLS = process.env.BACKEND_URL
+  ? [process.env.BACKEND_URL]
+  : ["http://127.0.0.1:5001", "http://127.0.0.1:5000"];
 
-export default function Home() {
-  const [inputText, setInputText] = useState("");
-  const router = useRouter();
-
-  const handleKeyDown = async (e) => {
-    if (e.key === "Enter") {
-      // Send the input question to the API and get the generated SQL query
-      const response = await fetch("/api/sql-query", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ question: inputText }),
+async function loadMetaDashboard(): Promise<MetaDashboard | null> {
+  for (const backendUrl of BACKEND_URLS) {
+    try {
+      const response = await fetch(`${backendUrl}/meta-dashboard`, {
+        cache: "no-store",
+        signal: AbortSignal.timeout(8_000),
       });
-      
-      const data = await response.json();
-      console.log("API Response:", data); // Log the entire response
-
-      // Pass the generated SQL query as a query param to the results page
-      if (data.sql) {
-        router.push(`/result?query=${encodeURIComponent(data.sql)}`);
-      } else {
-        console.error("Failed to generate SQL query.");
-      }
+      if (!response.ok) continue;
+      return (await response.json()) as MetaDashboard;
+    } catch {
+      // Try the next configured backend URL.
     }
-  };
+  }
+  return null;
+}
 
-  return (
-    <div className="flex items-center justify-center h-screen">
-      <input
-        type="text"
-        className="block mx-auto my-5 p-2 border rounded w-full max-w-4xl h-20 text-center text-3xl text-green-500"
-        placeholder="What do you want to see plotted?"
-        value={inputText}
-        onChange={(e) => setInputText(e.target.value)}
-        onKeyDown={handleKeyDown}
-      />
-    </div>
-  );
+export default async function Home() {
+  const meta = await loadMetaDashboard();
+  return <HomeDashboard initialMeta={meta} />;
 }
